@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentguard-cli"
+version = "0.1.0"
+description = "AgentGuard CLI - safety gateway for AI agent commands"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.9.0",
+    "httpx>=0.25.0",
+    "pydantic>=2.5.0",
+    "pyyaml>=6.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+agentguard = "agentguard_cli.main:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentguard_cli"]

@@ -1,0 +1,102 @@
+# AgentGuard Default Policy Rules
+#
+# Evaluated in precedence order:
+#   1. BLOCK        — safety-critical, cannot be overridden
+#   2. REQUIRE_HUMAN_APPROVAL — cannot be silently downgraded to ALLOW
+#   3. ALLOW
+#   4. Default      — applies to anything not matched by a rule
+#
+# An unmatched/unknown action NEVER defaults to ALLOW.
+
+rules:
+  - id: prod-destroy-block
+    if:
+      environment: production
+      action_type: infrastructure_destroy
+    then: BLOCK
+    reason: "Production infrastructure destruction is prohibited"
+
+  - id: prod-db-drop-block
+    if:
+      environment: production
+      action_type: database_destructive
+    then: BLOCK
+    reason: "Production destructive database operations are prohibited"
+
+  - id: prod-shell-high-risk-block
+    if:
+      environment: production
+      action_type: shell_high_risk
+    then: BLOCK
+    reason: "High-risk shell commands in production are prohibited"
+
+  - id: prod-apply-approval
+    if:
+      environment: production
+      action_type: infrastructure_modify
+    then: REQUIRE_HUMAN_APPROVAL
+    reason: "Production infrastructure modification requires approval"
+
+  - id: prod-db-write-approval
+    if:
+      environment: production
+      action_type: database_write
+    then: REQUIRE_HUMAN_APPROVAL
+    reason: "Production database writes require approval"
+
+  - id: staging-destroy-approval
+    if:
+      environment: staging
+      action_type: infrastructure_destroy
+    then: REQUIRE_HUMAN_APPROVAL
+    reason: "Staging infrastructure destruction requires approval"
+
+  - id: staging-plan-allow
+    if:
+      environment: staging
+      action_type: infrastructure_read
+    then: ALLOW
+    reason: "Staging infrastructure reads are allowed"
+
+  - id: prod-plan-allow
+    if:
+      environment: production
+      action_type: infrastructure_read
+    then: ALLOW
+    reason: "Production infrastructure reads are allowed"
+
+  - id: read-only-allow
+    if:
+      is_read_only: true
+    then: ALLOW
+    reason: "Read-only operations are allowed"
+
+  - id: staging-apply-allow
+    if:
+      environment: staging
+      action_type: infrastructure_modify
+    then: ALLOW
+    reason: "Staging infrastructure modifications are allowed"
+
+  - id: staging-db-read-allow
+    if:
+      environment: staging
+      action_type: database_read
+    then: ALLOW
+    reason: "Staging database reads are allowed"
+
+  - id: prod-db-read-allow
+    if:
+      environment: production
+      action_type: database_read
+    then: ALLOW
+    reason: "Production database reads are allowed"
+
+  - id: staging-db-write-allow
+    if:
+      environment: staging
+      action_type: database_write
+    then: ALLOW
+    reason: "Staging database writes are allowed"
+
+default: REQUIRE_HUMAN_APPROVAL
