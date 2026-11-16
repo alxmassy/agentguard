@@ -1,5 +1,6 @@
-"""Action detail and execution result endpoints.
+"""Action detail, listing, and execution result endpoints.
 
+GET  /api/v1/actions              — list all actions (with filtering & pagination)
 GET  /api/v1/actions/{id}         — full detail for one action
 POST /api/v1/actions/{id}/execute — CLI reports execution result
 """
@@ -8,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.db import repositories as repo
@@ -22,6 +23,27 @@ class ExecuteResultBody(BaseModel):
     exit_code: int
     stdout_meta: Optional[str] = None
     stderr_meta: Optional[str] = None
+
+
+@router.get("/actions")
+async def list_actions(
+    environment: Optional[str] = Query(None, description="Filter by environment (e.g. production, staging)"),
+    decision: Optional[str] = Query(None, description="Filter by decision (ALLOW, BLOCK, REQUIRE_HUMAN_APPROVAL)"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """List action requests with optional filtering and pagination."""
+    try:
+        actions, total = repo.list_actions(
+            environment=environment,
+            decision=decision,
+            limit=limit,
+            offset=offset,
+        )
+        return {"actions": actions, "total": total, "limit": limit, "offset": offset}
+    except Exception as e:
+        logger.error("Error listing actions: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/actions/{request_id}")

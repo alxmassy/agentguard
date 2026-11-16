@@ -17,7 +17,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.actions import router as actions_router
 from app.api.approvals import router as approvals_router
+from app.api.audit import router as audit_router
+from app.api.demo import router as demo_router
 from app.api.evaluate import router as evaluate_router
+from app.api.policies import router as policies_router
+from app.api.stats import router as stats_router
 from app.policy.loader import load_policies
 
 # Load .env before anything reads os.environ
@@ -36,7 +40,6 @@ DEFAULT_POLICY_PATH = Path(__file__).parent.parent.parent / "policies" / "defaul
 async def lifespan(app: FastAPI):
     """Application lifecycle: load policies and DB on startup."""
     # 1. Load policies — fail closed
-    # Resolve relative paths relative to backend root (where .env lives), not CWD
     _backend_root = Path(__file__).parent.parent
     raw_policy_path = os.environ.get("AGENTGUARD_POLICY_PATH", str(DEFAULT_POLICY_PATH))
     policy_path = Path(raw_policy_path)
@@ -56,15 +59,14 @@ async def lifespan(app: FastAPI):
         logger.critical("Backend cannot start without valid policies. Exiting.")
         sys.exit(1)
 
-    # 2. Initialize Supabase client — warn but don't exit if missing
-    #    (allows tests to run without DB credentials)
+    # 2. Initialize Supabase / SQLite client
     try:
         from app.db.client import init_db
         init_db()
         app.state.db_available = True
-        logger.info("Supabase connection initialized.")
+        logger.info("Storage connection initialized.")
     except Exception as e:
-        logger.warning("DB unavailable: %s — evaluations will not be persisted.", e)
+        logger.warning("DB unavailable: %s", e)
         app.state.db_available = False
 
     yield
@@ -81,7 +83,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten in Milestone 3 (auth)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -91,10 +93,20 @@ app.add_middleware(
 app.include_router(evaluate_router)
 app.include_router(approvals_router)
 app.include_router(actions_router)
+app.include_router(stats_router)
+app.include_router(audit_router)
+app.include_router(policies_router)
+app.include_router(demo_router)
 
 
 @app.get("/health")
 async def health_check():
-    """Health check — includes DB status."""
+    """Health check — includes DB status and backend mode."""
+    from app.db.client import get_client_type
     db_available = getattr(app.state, "db_available", False)
-    return {"status": "healthy", "version": "0.2.0", "db_available": db_available}
+    return {
+        "status": "healthy",
+        "version": "0.2.0",
+        "db_available": db_available,
+        "storage_mode": get_client_type(),
+    }

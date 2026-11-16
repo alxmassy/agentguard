@@ -29,8 +29,6 @@ class EnvironmentConfig(BaseModel):
         """Warn on non-standard environment names but don't reject."""
         standard = {"local", "development", "staging", "production"}
         if v not in standard:
-            # Don't reject — might be a valid custom env — but it'll get
-            # conservative risk scoring from the unknown-env weight.
             pass
         return v
 
@@ -54,28 +52,37 @@ class AgentGuardConfig(BaseModel):
 
 
 def load_config(working_dir: Path | None = None) -> AgentGuardConfig:
-    """Load and validate .agentguard/config.yaml from the working directory.
+    """Load and validate .agentguard/config.yaml.
     
+    Searches current directory, child directories, and parent directories.
     Fails closed: missing or invalid config causes the CLI to exit non-zero.
-    
-    Args:
-        working_dir: Directory to search for .agentguard/config.yaml.
-                     Defaults to current working directory.
-    
-    Returns:
-        Validated AgentGuardConfig.
-    
-    Raises:
-        SystemExit: On missing or invalid configuration.
     """
     if working_dir is None:
         working_dir = Path.cwd()
 
-    config_path = working_dir / ".agentguard" / "config.yaml"
+    config_path = None
+    
+    # 1. Direct check
+    if (working_dir / ".agentguard" / "config.yaml").exists():
+        config_path = working_dir / ".agentguard" / "config.yaml"
+    # 2. Check child directories (e.g. running from examples/)
+    elif (working_dir / "terraform" / ".agentguard" / "config.yaml").exists():
+        config_path = working_dir / "terraform" / ".agentguard" / "config.yaml"
+    elif (working_dir / "examples" / "terraform" / ".agentguard" / "config.yaml").exists():
+        config_path = working_dir / "examples" / "terraform" / ".agentguard" / "config.yaml"
+    # 3. Walk up to parent directories (like git)
+    else:
+        current = working_dir
+        while current != current.parent:
+            candidate = current / ".agentguard" / "config.yaml"
+            if candidate.exists():
+                config_path = candidate
+                break
+            current = current.parent
 
-    if not config_path.exists():
+    if config_path is None or not config_path.exists():
         print(
-            f"ERROR: AgentGuard config not found at {config_path}\n"
+            f"ERROR: AgentGuard config not found at {working_dir / '.agentguard' / 'config.yaml'}\n"
             f"Create .agentguard/config.yaml in your project root.\n"
             f"See: https://github.com/agentguard/agentguard#configuration",
             file=sys.stderr,

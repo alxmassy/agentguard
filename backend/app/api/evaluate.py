@@ -60,7 +60,7 @@ async def evaluate_action(
     response = decide(
         policy_verdict=policy_verdict,
         risk=risk,
-        intent=None,  # LLM intent layer — Milestone 5
+        intent=None,  # LLM intent layer
     )
 
     logger.info(
@@ -74,7 +74,24 @@ async def evaluate_action(
     # 5. Persist to DB (if available — graceful degradation if DB is down)
     if db_available:
         try:
+            # 5a. Log request_created audit event
+            repo.append_audit_event(
+                request_id=response.request_id,
+                event_type="request_created",
+                payload={
+                    "command": validated_request.command.raw,
+                    "argv": validated_request.command.argv,
+                    "environment": validated_request.context.environment,
+                    "agent_id": validated_request.context.agent_id,
+                    "tool": validated_request.parsed_action.tool,
+                    "operation": validated_request.parsed_action.operation,
+                },
+            )
+
+            # 5b. Persist action request
             repo.create_action_request(response=response, request=validated_request)
+
+            # 5c. Log decision_made audit event
             repo.append_audit_event(
                 request_id=response.request_id,
                 event_type="decision_made",
@@ -83,6 +100,7 @@ async def evaluate_action(
                     "policy_id": response.policy_id,
                     "risk_level": response.risk_level.value,
                     "risk_score": response.risk_score,
+                    "reason": response.reason,
                 },
             )
 
@@ -98,8 +116,6 @@ async def evaluate_action(
                 response = response.model_copy(update={"approval_id": approval_id})
 
         except Exception as e:
-            # DB write failure — log but don't fail the evaluation
-            # The safety decision is already made; audit loss is bad but not a security failure
             logger.error("DB write failed (non-fatal): %s", e)
     else:
         logger.warning("DB not available — evaluation result not persisted")

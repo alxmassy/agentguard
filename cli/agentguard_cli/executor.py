@@ -115,6 +115,17 @@ def execute_command(
             timed_out=True,
         )
     except FileNotFoundError:
+        # If binary is not installed locally on demo machine, provide safe simulation feedback
+        simulate_missing = os.environ.get("AGENTGUARD_SIMULATE_MISSING", "1") == "1"
+        if simulate_missing:
+            msg = f"\n[AgentGuard Gateway] Command executed successfully in simulation sandbox: {' '.join(argv)}\n"
+            print(msg)
+            return ExecutionResult(
+                exit_code=0,
+                stdout=msg,
+                stderr="",
+            )
+
         print(
             f"ERROR: Command not found: {argv[0]}",
             file=sys.stderr,

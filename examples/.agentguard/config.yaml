@@ -1,0 +1,17 @@
+# Example AgentGuard configuration for a Terraform project.
+#
+# Place this file at .agentguard/config.yaml in your project root.
+# The CLI reads this on every invocation.
+
+project:
+  name: payment-service
+  id: payment-service
+
+environment:
+  name: production    # staging | production | development | local
+
+agent:
+  id: claude-code
+
+api:
+  base_url: http://localhost:8000/api/v1
